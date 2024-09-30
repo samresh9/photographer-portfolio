@@ -2,6 +2,10 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import prisma from "./config/prisma";
 import serverRoutes from "./routes";
+import {
+  globalErrorHandler,
+  handleNotFound,
+} from "./middlewares/errorHandler.middleware";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +15,13 @@ app.use(express.json());
 app.get("/", (req: Request, res: Response) => {
   res.send("Hello, !");
 });
+
 serverRoutes(app);
+
+//Error Handler
+app.use(handleNotFound);
+app.use(globalErrorHandler);
+
 prisma
   .$connect()
   .then(() => {
