@@ -1,4 +1,4 @@
-import { Request, response, Response } from "express";
+import { Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
 import { userCreateSchema, userLoginSchema } from "../utils/validationSchema";
 import { z } from "zod";
@@ -35,46 +35,44 @@ export const signUp = asyncHandler(async (req: Request, res: Response) => {
   sendResponse(res, StatusCodes.CREATED, "User registered succssfully", user);
 });
 
-export const logIn = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+export const logIn = asyncHandler(
+  async (req: Request<UserLoginInput>, res: Response) => {
+    const { email, password }: UserLoginInput = req.body;
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      firstname: true,
-      lastname: true,
-      email: true,
-      password: true,
-    },
-  });
-  if (!existingUser) {
-    throw new NotFoundError("User with given email not found.");
-  }
-
-  const isPasswordCorrect = await bcrypt.compare(
-    password,
-    existingUser.password,
-  );
-
-  if (!isPasswordCorrect) {
-    throw new BadRequestError("Invalid Credentials!");
-  }
-  const accessToken = await generateAccessToken(existingUser.id);
-
-  sendResponse(res, StatusCodes.OK, "Success", { accessToken });
-});
-
-const generateAccessToken = async (userId: number) => {
-  try {
-    const payload = {
-      id: userId,
-    };
-    const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        email: true,
+        password: true,
+      },
     });
-    return accessToken;
-  } catch (error) {
-    throw error;
-  }
+    if (!existingUser) {
+      throw new NotFoundError("User with given email not found.");
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(
+      password,
+      existingUser.password,
+    );
+
+    if (!isPasswordCorrect) {
+      throw new BadRequestError("Invalid Credentials!");
+    }
+    const accessToken = generateAccessToken(existingUser.id);
+
+    sendResponse(res, StatusCodes.OK, "Success", { accessToken });
+  },
+);
+
+const generateAccessToken = (userId: number) => {
+  const payload = {
+    id: userId,
+  };
+  const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+  });
+  return accessToken;
 };

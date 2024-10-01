@@ -19,9 +19,10 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,   
+    "typeRoots": ["./node_modules/@types", "./@types"]
   },
-  "include": ["src/**/*", "eslint.config.mjs", "prisma/**/*"],
+  "include": ["src/**/*", "eslint.config.mjs", "prisma/**/*",  "@types"],
   "exclude": [
     "node_modules",
     "dist"

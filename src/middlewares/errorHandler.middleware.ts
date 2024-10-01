@@ -1,4 +1,5 @@
 import { StatusCodes } from "http-status-codes";
+import logger from "../utils/logger";
 
 const handleNotFound = (req, res, next) => {
   const error: any = new Error(`Not Found ${req.method} ${req.originalUrl}`);
@@ -8,12 +9,14 @@ const handleNotFound = (req, res, next) => {
 };
 
 const globalErrorHandler = (err: any, _req, res, _next) => {
-  console.log(err);
   const { code, message, errors, stack } = err;
+  logger.error(err);
   const timestamp = new Date().toISOString();
-  res.statusCode = err?.statusCode ?? StatusCodes.INTERNAL_SERVER_ERROR;
+  const statusCode = err?.statusCode ?? StatusCodes.INTERNAL_SERVER_ERROR;
+  res.statusCode = statusCode;
 
   const errorRes: any = {
+    statusCode: statusCode,
     message,
     status: false,
     timestamp,

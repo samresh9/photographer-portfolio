@@ -15,11 +15,51 @@ datasource db {
 }
 
 model User {
+  id                 Int                  @id @default(autoincrement())
+  email              String               @unique
+  firstname          String
+  lastname           String
+  password           String
+  albums             Album[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  PasswordResetToken PasswordResetToken[]
+
+  @@map("users")
+}
+
+model Album {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  folderName  String
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images      Image[] // One-to-many relationship with Image
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("albums")
+}
+
+model Image {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  firstname String
-  lastname  String
-  password  String
+  albumId   Int
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  imageUrl  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("images")
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("password_reset_tokens")
 }
