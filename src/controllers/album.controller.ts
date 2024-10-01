@@ -9,41 +9,64 @@ import { NotFoundError } from "../errors/NotFoundError";
 import { UnAuthorizedError } from "../errors/UnAuthorizedError";
 import fs from "fs/promises";
 import { paginationMetadata } from "../utils/paginationMetadata";
-
+import { generateSignedUrl } from "./file.controller";
+import crypto from "node:crypto";
 declare module "express" {
   interface Request {
     user?: Partial<User>;
   }
 }
 
+const generateRandomString = (length: number): string => {
+  // Generate random bytes
+  const buffer = crypto.randomBytes(Math.ceil(length / 2));
+  // Convert bytes to hexadecimal string
+  const randomString = buffer.toString("hex").substring(0, length);
+  return randomString;
+};
+
 export const createAlbum = asyncHandler(
   async (req: Request & { files?: Express.Multer.File[] }, res) => {
     const { title, description } = req.body;
-    const folderName = req?.files[0]?.destination.split(path.sep).pop();
     const userId = req?.user?.id;
+    const folderName = `${generateRandomString(15)}-${userId}`;
+    // Start a transaction
+    const transaction = await prisma.$transaction(async (tx) => {
+      // Step 1: Create the album
+      const album = await tx.album.create({
+        data: {
+          title,
+          description,
+          userId,
+          folderName: folderName,
+        },
+      });
 
-    const album = await prisma.album.create({
-      data: {
-        title,
-        description,
-        userId,
-        folderName,
-      },
+      // Step 2: Save the uploaded files
+      const dir = path.join(__dirname, "../uploads", album.folderName);
+      const filePaths = await saveFiles(req.files, dir); // Assuming saveFiles is defined as in the previous answer
+
+      // Step 3: Create image records
+      const images = filePaths.map((filePath: string) => ({
+        albumId: album.id,
+        imageUrl: `${album.folderName}/${path.basename(filePath)}`,
+      }));
+
+      await tx.image.createMany({ data: images });
+
+      return album; // Return the created album
     });
 
-    const images = req.files.map((file: Express.Multer.File) => ({
-      albumId: album.id,
-      imageUrl: `${folderName}/${file.filename}`, // Store the file path of each image
-    }));
-
-    await prisma.image.createMany({ data: images });
-    const albumWithImage = await prisma.album.findFirst({
+    // Fetch the album with images to return
+    const albumWithImages = await prisma.album.findFirst({
       where: {
-        id: album.id,
+        id: transaction.id,
       },
       include: { images: true },
     });
-    sendResponse(res, StatusCodes.CREATED, "Album Crearted", albumWithImage);
+
+    // Send response
+    sendResponse(res, StatusCodes.CREATED, "Album Created", albumWithImages);
   },
 );
 
@@ -58,6 +81,7 @@ export const updateAlbum = asyncHandler(
       where: { id: parseInt(albumId) },
       include: { user: true },
     });
+
     const userId = req.user?.id;
     if (!album) {
       throw new NotFoundError("Album not found.");
@@ -76,17 +100,20 @@ export const updateAlbum = asyncHandler(
       },
     });
 
-    if (imagesToRemove.length > 0) {
+    if (imagesToRemove?.length > 0) {
       await removeImagesFromAlbum(album.id, imagesToRemove);
     }
 
     if (newFiles.length) {
-      const images = req?.files.map((file: Express.Multer.File) => ({
+      const dir = path.join(__dirname, "../uploads", album.folderName);
+      const filePaths = await saveFiles(req.files, dir);
+      const images = filePaths.map((filePath: string) => ({
         albumId: album.id,
-        imageUrl: file.filename, // Store the file path of each image
+        imageUrl: `${album.folderName}/${path.basename(filePath)}`,
       }));
       await prisma.image.createMany({ data: images });
     }
+
     const updatedAlbum = await prisma.album.findFirst({
       where: {
         id: album.id,
@@ -153,7 +180,7 @@ const unlinkImages = async (images: Image[]) => {
 
 const deleteFolder = async (folderName: string) => {
   const folderPath = path.join(__dirname, "..", "uploads", folderName);
-  await fs.rm(folderPath);
+  await fs.rm(folderPath, { recursive: true });
 };
 
 export const getAllAlbums = asyncHandler(
@@ -205,5 +232,27 @@ export const getAlbum = asyncHandler(async (req: Request, res: Response) => {
   if (!album) {
     throw new NotFoundError("Album not found.");
   }
+
+  const imagesWithUrl = album.images.map((image) => {
+    const preSignedUrl = generateSignedUrl(image.imageUrl);
+    return { ...image, imageUrl: preSignedUrl };
+  });
+
+  album.images = imagesWithUrl;
   sendResponse(res, StatusCodes.OK, "Success", album);
 });
+
+const saveFiles = async (
+  files: Express.Multer.File[],
+  dir: string,
+): Promise<string[]> => {
+  await fs.mkdir(dir, { recursive: true });
+  const filePaths = await Promise.all(
+    files.map(async (file) => {
+      const filePath = path.join(dir, `${Date.now()}-${file.originalname}`);
+      await fs.writeFile(filePath, file.buffer);
+      return filePath;
+    }),
+  );
+  return filePaths;
+};

@@ -38,7 +38,7 @@ export const albumSchema = z.object({
 export const albumUpdateSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
-  imagesToRemove: z.string().transform(transformFormDataToNumbers),
+  imagesToRemove: z.string().transform(transformFormDataToNumbers).optional(),
 });
 
 export const albumFilterSchema = z.object({
