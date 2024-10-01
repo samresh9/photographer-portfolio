@@ -14,10 +14,7 @@ const transformFormDataToNumbers = (value: any) => {
 
 export const userCreateSchema = z.object({
   email: z.string().email("Invalid Email format").min(1),
-  firstname: z
-    .string()
-    .min(2, { message: "First name is required" })
-    .transform((userName) => `Hi, ${userName}`),
+  firstname: z.string().min(2, { message: "First name is required" }),
   lastname: z.string().min(1, { message: "Last name is required" }),
   password: z
     .string()
@@ -42,4 +39,20 @@ export const albumUpdateSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   imagesToRemove: z.string().transform(transformFormDataToNumbers),
+});
+
+export const albumFilterSchema = z.object({
+  search: z.string().optional(),
+  page: z
+    .string()
+    .default("1")
+    .transform((val) => Number(val)),
+  limit: z
+    .string()
+    .default("10")
+    .transform((val) => Number(val))
+    .refine((val) => val <= 100, {
+      message: "Limit must be less than or equal to 100",
+    }),
+  includeOthers: z.enum(["true", "false"]).default("false"),
 });

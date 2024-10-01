@@ -1,14 +1,15 @@
 import path from "path";
 import asyncHandler from "../utils/asyncHandler";
 import { Request, Response } from "express";
-import { Image, User } from "@prisma/client";
+import { Image, Prisma, User } from "@prisma/client";
 import prisma from "../config/prisma";
 import { sendResponse } from "../utils/apiResponse";
 import { StatusCodes } from "http-status-codes";
 import { NotFoundError } from "../errors/NotFoundError";
 import { UnAuthorizedError } from "../errors/UnAuthorizedError";
-import fs from "node:fs";
-import logger from "../utils/logger";
+import fs from "fs/promises";
+import { paginationMetadata } from "../utils/paginationMetadata";
+
 declare module "express" {
   interface Request {
     user?: Partial<User>;
@@ -130,26 +131,79 @@ export const deleteAlbum = asyncHandler(async (req: Request, res: Response) => {
     throw new NotFoundError("Album not found.");
   }
 
-  // Unlink image files before deleting the album using the unified function
-  unlinkImages(album.images);
+  // Delete the folder and its contents
+  await deleteFolder(album.folderName);
 
   await prisma.album.delete({
     where: { id: parseInt(albumId) },
   });
 
-  res.status(200).json({ message: "Album deleted successfully." });
+  sendResponse(res, StatusCodes.OK, "Album deleted successfully.", true);
 });
 
-const unlinkImages = (images: Image[]) => {
+const unlinkImages = async (images: Image[]) => {
   const filePaths = images.map((image) =>
-    path.join(__dirname, "..", "..", "uploads", image.imageUrl),
+    path.join(__dirname, "..", "uploads", image.imageUrl),
   );
 
-  filePaths.forEach((filePath) => {
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        logger.error(`Failed to delete local file ${filePath}:`, err);
-      }
-    });
-  });
+  for (const filePath of filePaths) {
+    await fs.unlink(filePath);
+  }
 };
+
+const deleteFolder = async (folderName: string) => {
+  const folderPath = path.join(__dirname, "..", "uploads", folderName);
+  await fs.rm(folderPath);
+};
+
+export const getAllAlbums = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { page, limit, includeOthers, search } = req.query;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    const userId = req.user?.id;
+
+    const whereCondition: Prisma.AlbumWhereInput = {
+      ...(includeOthers === "true" ? {} : { userId }),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: String(search), mode: "insensitive" } },
+              {
+                description: { contains: String(search), mode: "insensitive" },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const paginatedResult = await prisma.album.findMany({
+      where: whereCondition,
+      skip: offset,
+      take: Number(limit),
+    });
+
+    const totalAlbums = await prisma.album.count({ where: whereCondition });
+    const metadata = paginationMetadata(
+      totalAlbums,
+      Number(limit),
+      Number(page),
+    );
+    const data = { paginatedResult, metadata };
+
+    sendResponse(res, StatusCodes.OK, "Success", data);
+  },
+);
+
+export const getAlbum = asyncHandler(async (req: Request, res: Response) => {
+  const { albumId } = req.params;
+  const album = await prisma.album.findUnique({
+    where: { id: parseInt(albumId) },
+    include: { user: true, images: true },
+  });
+
+  if (!album) {
+    throw new NotFoundError("Album not found.");
+  }
+  sendResponse(res, StatusCodes.OK, "Success", album);
+});

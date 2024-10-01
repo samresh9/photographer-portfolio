@@ -10,7 +10,7 @@ const handleNotFound = (req, res, next) => {
 
 const globalErrorHandler = (err: any, _req, res, _next) => {
   const { code, message, errors, stack } = err;
-  logger.error(err);
+  logger.error(err?.stack);
   const timestamp = new Date().toISOString();
   const statusCode = err?.statusCode ?? StatusCodes.INTERNAL_SERVER_ERROR;
   res.statusCode = statusCode;

@@ -19,11 +19,12 @@ const logger: Logger = createLogger({
   ),
   transports: [
     new transports.Console({
+      level: "info",
       format: consoleLogFormat,
     }),
     new transports.File({
-      filename: "logs/app.log",
-      level: "info",
+      filename: "logs/error.log",
+      level: "error",
       format: combine(timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), json()),
     }),
   ],

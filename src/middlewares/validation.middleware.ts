@@ -1,11 +1,15 @@
 import { type AnyZodObject } from "zod";
-import type { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 import asyncHandler from "../utils/asyncHandler";
 import { ValidationError } from "../errors/ValidationError";
+import { RequestSourceEnum } from "../common/commant.constants";
 
-const validate = (schema: AnyZodObject) => {
+const validate = (
+  schema: AnyZodObject,
+  source: RequestSourceEnum = RequestSourceEnum.BODY,
+) => {
   return asyncHandler((req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse(req[source]);
 
     if (!result.success) {
       const errors: Record<string, string[]> = {};
@@ -20,7 +24,7 @@ const validate = (schema: AnyZodObject) => {
       });
       throw new ValidationError(errors);
     }
-    req.body = result.data;
+    req[source] = result.data;
     next();
   });
 };
