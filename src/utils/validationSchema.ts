@@ -56,3 +56,17 @@ export const albumFilterSchema = z.object({
     }),
   includeOthers: z.enum(["true", "false"]).default("false"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid Email format").min(1),
+});
+
+export const passwordResetSchema = z.object({
+  newPassword: z
+    .string()
+    .min(7, "Password must be at least 7 characters long")
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{7,}$/,
+      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+    ),
+});

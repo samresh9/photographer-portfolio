@@ -9,6 +9,8 @@ import asyncHandler from "../utils/asyncHandler";
 import { sendResponse } from "../utils/apiResponse";
 import { NotFoundError } from "../errors/NotFoundError";
 import * as jwt from "jsonwebtoken";
+import { generateRandomString } from "../utils/randomTokenGenerator";
+import { sendEmail } from "../utils/sendEmail";
 type UserCreateInput = z.infer<typeof userCreateSchema>;
 type UserLoginInput = z.infer<typeof userLoginSchema>;
 
@@ -76,3 +78,76 @@ const generateAccessToken = (userId: number) => {
   });
   return accessToken;
 };
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    throw new BadRequestError("User with this email does not exist.");
+  }
+
+  await prisma.passwordResetToken.deleteMany({
+    where: { userId: user.id },
+  });
+
+  const token = generateRandomString(32);
+  const calculateMillisecond = 60 * 60 * 1000; //1hrs
+  const expiresAt = new Date(Date.now() + calculateMillisecond);
+  await prisma.passwordResetToken.create({
+    data: {
+      token,
+      expiresAt,
+      userId: user.id,
+    },
+  });
+
+  const resetLink = `${process.env.BASE_URL}/reset-password/${token}`;
+  await sendEmail(user.email, user, resetLink);
+
+  sendResponse(
+    res,
+    StatusCodes.CREATED,
+    "Password resert url sent successfully.",
+    true,
+  );
+});
+
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    const passwordResetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: token, expiresAt: { gte: new Date() } },
+    });
+
+    if (!passwordResetToken) {
+      throw new BadRequestError("Invalid or expired token.");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: passwordResetToken.userId },
+    });
+
+    if (!user) {
+      throw new BadRequestError("User not found.");
+    }
+
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    await prisma.passwordResetToken.delete({
+      where: { token },
+    });
+
+    sendResponse(res, StatusCodes.OK, "Password reset successful.", true);
+  },
+);
