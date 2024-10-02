@@ -1,7 +1,7 @@
 import path from "path";
 import asyncHandler from "../utils/asyncHandler";
 import { Request, Response } from "express";
-import { Image, Prisma, User } from "@prisma/client";
+import { Image, Prisma } from "@prisma/client";
 import prisma from "../config/prisma";
 import { sendResponse } from "../utils/apiResponse";
 import { StatusCodes } from "http-status-codes";
@@ -11,12 +11,6 @@ import fs from "fs/promises";
 import { paginationMetadata } from "../utils/paginationMetadata";
 import { generateSignedUrl } from "./file.controller";
 import { generateRandomString } from "../utils/randomTokenGenerator";
-
-declare module "express" {
-  interface Request {
-    user?: Partial<User>;
-  }
-}
 
 export const createAlbum = asyncHandler(
   async (req: Request & { files?: Express.Multer.File[] }, res) => {

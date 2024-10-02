@@ -5,22 +5,6 @@ import fs from "fs";
 import { NotFoundError } from "../errors/NotFoundError";
 import { Request, Response } from "express";
 
-// const verifyToken = (req, res, next) => {
-//   const token = req.query.token;
-
-//   if (!token) return res.status(403).send("Access denied. No token provided.");
-
-//   try {
-//     const decoded = jwt.verify(
-//       token,
-//       process.env.FILE_SERVE_SECRET_KEY,
-//     ) as JwtPayload;
-//     req.filePath = decoded.filePath;
-//     next();
-//   } catch (error) {
-//     res.status(403).send("Invalid or expired token.");
-//   }
-// };
 export const accessFile = asyncHandler(
   async (req: Request, res: Response): Promise<any> => {
     const token = req.query.token as string;

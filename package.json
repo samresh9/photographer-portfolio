@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "prepare": "husky",
     "prettier": "prettier --write \"src/**/*.ts\"",
-    "migrate:dev": "prisma migrate dev --name"
+    "migrate:dev": "prisma migrate dev --name",
+    "seed": "ts-node prisma/seed.ts"
   },
   "lint-staged": {
     "src/**/*.ts": [
