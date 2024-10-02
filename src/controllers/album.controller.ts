@@ -11,15 +11,18 @@ import fs from "fs/promises";
 import { paginationMetadata } from "../utils/paginationMetadata";
 import { generateSignedUrl } from "./file.controller";
 import { generateRandomString } from "../utils/randomTokenGenerator";
+import { albumSchema, albumUpdateSchema } from "../utils/validationSchema";
+import { z } from "zod";
 
+type AlbumCreateType = z.infer<typeof albumSchema>;
+type AlbumUpdateType = z.infer<typeof albumUpdateSchema>;
 export const createAlbum = asyncHandler(
   async (req: Request & { files?: Express.Multer.File[] }, res) => {
-    const { title, description } = req.body;
+    const { title, description }: AlbumCreateType = req.body;
     const userId = req?.user?.id;
     const folderName = `${generateRandomString(15)}-${userId}`;
     // Start a transaction
     const transaction = await prisma.$transaction(async (tx) => {
-      // Step 1: Create the album
       const album = await tx.album.create({
         data: {
           title,
@@ -29,11 +32,9 @@ export const createAlbum = asyncHandler(
         },
       });
 
-      // Step 2: Save the uploaded files
       const dir = path.join(__dirname, "../uploads", album.folderName);
-      const filePaths = await saveFiles(req.files, dir); // Assuming saveFiles is defined as in the previous answer
+      const filePaths = await saveFiles(req.files, dir);
 
-      // Step 3: Create image records
       const images = filePaths.map((filePath: string) => ({
         albumId: album.id,
         imageUrl: `${album.folderName}/${path.basename(filePath)}`,
@@ -41,10 +42,9 @@ export const createAlbum = asyncHandler(
 
       await tx.image.createMany({ data: images });
 
-      return album; // Return the created album
+      return album;
     });
 
-    // Fetch the album with images to return
     const albumWithImages = await prisma.album.findFirst({
       where: {
         id: transaction.id,
@@ -52,7 +52,6 @@ export const createAlbum = asyncHandler(
       include: { images: true },
     });
 
-    // Send response
     sendResponse(res, StatusCodes.CREATED, "Album Created", albumWithImages);
   },
 );
@@ -60,7 +59,7 @@ export const createAlbum = asyncHandler(
 export const updateAlbum = asyncHandler(
   async (req: Request & { files?: Express.Multer.File[] }, res: Response) => {
     const { albumId } = req.params;
-    const { title, description, imagesToRemove } = req.body;
+    const { title, description, imagesToRemove }: AlbumUpdateType = req.body;
 
     const newFiles = req.files || [];
 
@@ -220,14 +219,19 @@ export const getAlbum = asyncHandler(async (req: Request, res: Response) => {
     throw new NotFoundError("Album not found.");
   }
 
-  const imagesWithUrl = album.images.map((image) => {
+  const imagesWithSignedUrl = generateUrl(album.images);
+
+  album.images = imagesWithSignedUrl;
+  sendResponse(res, StatusCodes.OK, "Success", album);
+});
+
+const generateUrl = (images: Image[]) => {
+  const imagesWithSignedUrl = images.map((image) => {
     const preSignedUrl = generateSignedUrl(image.imageUrl);
     return { ...image, imageUrl: preSignedUrl };
   });
-
-  album.images = imagesWithUrl;
-  sendResponse(res, StatusCodes.OK, "Success", album);
-});
+  return imagesWithSignedUrl;
+};
 
 const saveFiles = async (
   files: Express.Multer.File[],

@@ -36,7 +36,7 @@ export const albumSchema = z.object({
 });
 
 export const albumUpdateSchema = z.object({
-  title: z.string(),
+  title: z.string().optional(),
   description: z.string().optional(),
   imagesToRemove: z.string().transform(transformFormDataToNumbers).optional(),
 });

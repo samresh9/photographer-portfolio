@@ -32,6 +32,6 @@ export const accessFile = asyncHandler(
 export const generateSignedUrl = (filepath: string) => {
   const path = `uploads/${filepath}`; // Example file
   const token = jwt.sign({ path }, process.env.FILE_SERVE_SECRET_KEY);
-  const signedUrl = `http://localhost:3000/access-file?token=${token}`;
+  const signedUrl = `http://localhost:${process.env.PORT}/api/v1/access-file?token=${token}`;
   return signedUrl;
 };

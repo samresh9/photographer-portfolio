@@ -7,7 +7,9 @@ import {
   handleNotFound,
 } from "./middlewares/errorHandler.middleware";
 import logger from "./utils/logger";
-
+import swaggerUi from "swagger-ui-express";
+import swaggerJsDoc from "swagger-jsdoc";
+import { swaggerOptions } from "./config/swaggerOptions";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -19,6 +21,9 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 serverRoutes(app);
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 //Error Handler
 app.use(handleNotFound);
